@@ -31,7 +31,7 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 db.Proyecto = require('../models/proyecto.js')(sequelize, Sequelize);
-db.Payment = require('../models/payment.js')(sequelize, Sequelize);
+
 
 
 module.exports = db;
