@@ -9,7 +9,7 @@ const {
   deleteProyecto
 } = require('../controllers/proyecto.controller');
 
-// Ruta para crear un nuevo proyecto
+// Ruta para crear un nuevo proyecto con detalles de pago y PaymentIntent
 router.post('/', createProyecto);
 
 // Ruta para obtener todos los proyectos
