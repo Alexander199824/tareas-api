@@ -9,7 +9,8 @@ const Payment = db.Payment;
 // Crear un nuevo proyecto con detalles de pago y PaymentIntent
 exports.createProyecto = async (req, res) => {
   try {
-    const { titulo, descripcion, fecha_vencimiento, prioridad, asignado_a, categoria, costo_proyecto, metodo_pago } = req.body;
+    const { titulo, descripcion, fecha_vencimiento, prioridad, asignado_a, categoria, costo_proyecto, metodo_pago, paymentMethodId } = req.body;
+
     const proyecto = await Proyecto.create({
       titulo,
       descripcion,
@@ -19,39 +20,36 @@ exports.createProyecto = async (req, res) => {
       asignado_a,
       categoria,
       costo_proyecto,
-      pagado: metodo_pago ? true : false, // Si hay un método de pago, marcar como pagado
+      pagado: metodo_pago === 'stripe', // Marcar como pagado si se usa Stripe
       metodo_pago,
-      fecha_pago: metodo_pago ? new Date() : null // Fecha de pago si se proporciona método
+      fecha_pago: metodo_pago === 'stripe' ? new Date() : null // Fecha de pago si se proporciona método
     });
 
-    if (metodo_pago) {
-      // Crear PaymentIntent de Stripe
+    if (metodo_pago === 'stripe' && paymentMethodId) {
+      // Crear y confirmar PaymentIntent con el ID del método de pago
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(costo_proyecto * 100), // Convertir a centavos
         currency: 'usd',
-        payment_method_types: ['card'],
+        payment_method: paymentMethodId,
+        confirm: true
       });
 
-      // Crear registro de pago
-      await Payment.create({
-        amount: costo_proyecto,
-        currency: 'usd',
-        status: 'pending',
-        paymentIntentId: paymentIntent.id,
-        clientSecret: paymentIntent.client_secret
-      });
-
-      res.status(201).json({
-        message: 'Proyecto creado con éxito y PaymentIntent generado',
-        proyecto,
-        clientSecret: paymentIntent.client_secret
-      });
+      if (paymentIntent.status === 'succeeded') {
+        res.status(201).json({
+          message: 'Proyecto y pago completados con éxito',
+          proyecto
+        });
+      } else {
+        res.status(400).json({
+          message: 'Error en la confirmación del pago'
+        });
+      }
     } else {
       res.status(201).json({ message: 'Proyecto creado con éxito', proyecto });
     }
   } catch (error) {
-    console.error('Error al crear proyecto o PaymentIntent:', error);
-    res.status(500).json({ message: 'Error al crear el proyecto', error: error.message });
+    console.error('Error al crear proyecto o procesar el pago:', error);
+    res.status(500).json({ message: 'Error al crear el proyecto o procesar el pago', error: error.message });
   }
 };
 
