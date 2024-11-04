@@ -14,6 +14,11 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' })); // Ajusta el límite según tus necesidades
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
+// Agrega una ruta para la raíz
+app.get('/', (req, res) => {
+  res.send('Bienvenido a la API de Proyectos');
+});
+
 db.sequelize.sync({ alter: true })
   .then(() => {
     console.log("La base de datos ha sido sincronizada correctamente.");
