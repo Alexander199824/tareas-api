@@ -1,12 +1,9 @@
-// controllers/proyecto.controller.js
 const env = require('../config/env');
 const Stripe = require('stripe');
 const stripe = Stripe(env.stripeSecretKey);
-const db = require('../models/proyecto');
+const db = require('../config/db.config');
 const Proyecto = db.Proyecto;
-const Payment = db.Payment;
 
-// Crear un nuevo proyecto con detalles de pago y PaymentIntent
 exports.createProyecto = async (req, res) => {
   try {
     const { titulo, descripcion, fecha_vencimiento, prioridad, asignado_a, categoria, costo_proyecto, metodo_pago, paymentMethodId } = req.body;
@@ -14,46 +11,40 @@ exports.createProyecto = async (req, res) => {
     const proyecto = await Proyecto.create({
       titulo,
       descripcion,
-      completada: false, // valor por defecto
+      completada: false,
       fecha_vencimiento,
-      prioridad: prioridad || 'media', // valor por defecto
+      prioridad: prioridad || 'media',
       asignado_a,
       categoria,
       costo_proyecto,
-      pagado: metodo_pago === 'stripe', // Marcar como pagado si se usa Stripe
+      pagado: metodo_pago === 'stripe',
       metodo_pago,
-      fecha_pago: metodo_pago === 'stripe' ? new Date() : null // Fecha de pago si se proporciona método
+      fecha_pago: metodo_pago === 'stripe' ? new Date() : null
     });
 
     if (metodo_pago === 'stripe' && paymentMethodId) {
-      // Crear y confirmar PaymentIntent con el ID del método de pago
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(costo_proyecto * 100), // Convertir a centavos
+        amount: Math.round(costo_proyecto * 100),
         currency: 'usd',
         payment_method: paymentMethodId,
         confirm: true
       });
 
       if (paymentIntent.status === 'succeeded') {
-        res.status(201).json({
-          message: 'Proyecto y pago completados con éxito',
-          proyecto
-        });
+        proyecto.pagado = true;
+        await proyecto.save();
+        res.status(201).json({ message: 'Proyecto y pago completados con éxito', proyecto });
       } else {
-        res.status(400).json({
-          message: 'Error en la confirmación del pago'
-        });
+        res.status(400).json({ message: 'Error en la confirmación del pago' });
       }
     } else {
       res.status(201).json({ message: 'Proyecto creado con éxito', proyecto });
     }
   } catch (error) {
-    console.error('Error al crear proyecto o procesar el pago:', error);
     res.status(500).json({ message: 'Error al crear el proyecto o procesar el pago', error: error.message });
   }
 };
 
-// Obtener todos los proyectos
 exports.getAllProyectos = async (req, res) => {
   try {
     const proyectos = await Proyecto.findAll();
@@ -63,7 +54,6 @@ exports.getAllProyectos = async (req, res) => {
   }
 };
 
-// Obtener un proyecto por ID
 exports.getProyectoById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,7 +68,6 @@ exports.getProyectoById = async (req, res) => {
   }
 };
 
-// Actualizar un proyecto
 exports.updateProyecto = async (req, res) => {
   try {
     const { id } = req.params;
@@ -89,18 +78,20 @@ exports.updateProyecto = async (req, res) => {
       return res.status(404).json({ message: 'Proyecto no encontrado' });
     }
 
+    const vencido = fecha_vencimiento && new Date(fecha_vencimiento) < new Date();
+
     await proyecto.update({
       titulo,
       descripcion,
-      completada,
+      completada: vencido ? confirm("¿Está completado?") : completada,
       fecha_vencimiento,
       prioridad,
       asignado_a,
       categoria,
       costo_proyecto,
-      pagado: metodo_pago ? true : pagado, // Actualizar estado de pago
+      pagado: metodo_pago === 'stripe' ? true : pagado,
       metodo_pago,
-      fecha_pago: metodo_pago ? new Date() : proyecto.fecha_pago // Actualizar fecha de pago si se agrega método
+      fecha_pago: metodo_pago === 'stripe' ? new Date() : proyecto.fecha_pago
     });
 
     res.status(200).json({ message: 'Proyecto actualizado con éxito', proyecto });
@@ -109,7 +100,6 @@ exports.updateProyecto = async (req, res) => {
   }
 };
 
-// Eliminar un proyecto
 exports.deleteProyecto = async (req, res) => {
   try {
     const { id } = req.params;
@@ -122,5 +112,23 @@ exports.deleteProyecto = async (req, res) => {
     res.status(200).json({ message: 'Proyecto eliminado con éxito' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar el proyecto', error: error.message });
+  }
+};
+
+exports.createPaymentIntent = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount) {
+      return res.status(400).json({ message: 'El monto es requerido' });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: 'usd',
+    });
+
+    res.status(200).json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al crear PaymentIntent', error: error.message });
   }
 };

@@ -1,4 +1,3 @@
-// routes/proyectorouter.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -6,22 +5,19 @@ const {
   getAllProyectos,
   getProyectoById,
   updateProyecto,
-  deleteProyecto
+  deleteProyecto,
+  createPaymentIntent, // Agregar el controlador de PaymentIntent
 } = require('../controllers/proyecto.controller');
 
-// Ruta para crear un nuevo proyecto con detalles de pago y PaymentIntent
+// Rutas para proyectos
 router.post('/', createProyecto);
-
-// Ruta para obtener todos los proyectos
 router.get('/', getAllProyectos);
-
-// Ruta para obtener un proyecto por ID
 router.get('/:id', getProyectoById);
-
-// Ruta para actualizar un proyecto
 router.put('/:id', updateProyecto);
-
-// Ruta para eliminar un proyecto
 router.delete('/:id', deleteProyecto);
 
+// Ruta para crear PaymentIntent
+router.post('/create-payment-intent', createPaymentIntent);
+
 module.exports = router;
+
